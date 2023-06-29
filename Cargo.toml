@@ -12,13 +12,34 @@ repository = "https://github.com/ujang360/ecies-ed25519-morus"
 
 [features]
 default = ["std"]
-std = ["blake3/std", "hex/std", "thiserror-no-std/std", "zeroize/std"]
+std = [
+    "blake3/std",
+    "ed25519-dalek/std",
+    "hex/std",
+    "rand_core/std",
+    "thiserror-no-std/std",
+    "zeroize/std",
+]
 aarch64-optimizations = ["blake3/neon", "zeroize/aarch64"]
 pure = ["blake3/pure"]
 
 [dependencies]
 arrayref = "0.3.7"
 blake3 = { version = "1.4.0", default-features = false }
+ed25519-dalek = { version = "2.0.0-rc.3", default-features = false, features = [
+    "fast",
+    "serde",
+    "signature",
+    "zeroize",
+] }
 hex = { version = "0.4.3", default-features = false }
+rand_core = { version = "0.6.4", default-features = false, features = [
+    "getrandom",
+    "serde",
+] }
+serde = { version = "1.0.164", default-features = false, features = ["derive"] }
 thiserror-no-std = "2.0.2"
-zeroize = { version = "1.6.0", default-features = false, features = ["derive"] }
+zeroize = { version = "1.6.0", default-features = false, features = [
+    "derive",
+    "serde",
+] }
