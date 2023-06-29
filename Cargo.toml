@@ -1,0 +1,24 @@
+[package]
+name = "ecies-ed25519-morus"
+version = "0.1.0"
+edition = "2021"
+authors = ["Aditya Kresna <aditya.kresna@outlook.co.id>"]
+categories = ["cryptography", "no-std::no-alloc"]
+description = "Experimental Integrated Encryption Scheme on Ed25519 using MORUS-1280-128 and Blake3"
+keywords = ["ecies", "encryption", "ed25519", "curve25519", "morus"]
+license-file = "LICENSE"
+readme = "README.md"
+repository = "https://github.com/ujang360/ecies-ed25519-morus"
+
+[features]
+default = ["std"]
+std = ["blake3/std", "hex/std", "thiserror-no-std/std", "zeroize/std"]
+aarch64-optimizations = ["blake3/neon", "zeroize/aarch64"]
+pure = ["blake3/pure"]
+
+[dependencies]
+arrayref = "0.3.7"
+blake3 = { version = "1.4.0", default-features = false }
+hex = { version = "0.4.3", default-features = false }
+thiserror-no-std = "2.0.2"
+zeroize = { version = "1.6.0", default-features = false, features = ["derive"] }
