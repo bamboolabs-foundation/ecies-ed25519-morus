@@ -26,8 +26,15 @@ pure = ["blake3/pure"]
 [dependencies]
 arrayref = "0.3.7"
 blake3 = { version = "1.4.0", default-features = false }
+curve25519-dalek = { version = "4.0.0-rc.3", default-features = false, features = [
+    "precomputed-tables",
+    "rand_core",
+    "serde",
+    "zeroize",
+] }
 ed25519-dalek = { version = "2.0.0-rc.3", default-features = false, features = [
     "fast",
+    "rand_core",
     "serde",
     "signature",
     "zeroize",
