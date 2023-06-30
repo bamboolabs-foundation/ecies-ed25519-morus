@@ -2,6 +2,71 @@
 #![forbid(unsafe_code)]
 #![deny(warnings)]
 
+/// Experimental [ECIES](https://en.wikipedia.org/wiki/Integrated_Encryption_Scheme) on [Twisted Edwards Curve25519](https://en.wikipedia.org/wiki/Curve25519) and [MORUS-1280-128](https://competitions.cr.yp.to/round3/morusv2.pdf)
+///
+/// ## Notes
+///
+/// - [Flexible Symmetric Cryptography - Impractical plaintext recovery attack](https://eprint.iacr.org/2018/464.pdf).
+/// - This work misuses the `sign & verify` keypair in the `ed25519` scheme for accomplishing `ECIES`. We call this, a perversion because we should only use the `ephemeral ones` (except for the recipient).
+/// - No security audits, and perhaps will not happen.
+///
+/// ## Features
+///
+/// - `no-std` environment (for example: [wasm](https://en.wikipedia.org/wiki/WebAssembly)):
+///
+/// ```bash
+/// cargo add ecies-ed25519-morus --no-default-features --features="pure"
+/// ```
+///
+/// - `std` environment (default):
+///
+/// ```bash
+/// cargo add ecies-ed25519-morus
+/// ```
+///
+/// - `std` and `aarch64` environment (for example: [Apple Silicon](https://en.wikipedia.org/wiki/Apple_silicon))
+///
+/// ```bash
+/// cargo add ecies-ed25519-morus --features="aarch64-optimizations"
+/// ```
+///
+/// ## Example
+///
+/// ```rust
+/// use rand_core::RngCore;
+/// use ecies_ed25519_morus::{encrypt_into, decrypt_into};
+///
+/// const BUFFER_SIZE: usize = 512 * 1024; // avoid higher than this to prevent stackoverflow
+/// let mut rng = rand_core::OsRng::default();
+/// let sender_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+/// let receiver_keypair = ed25519_dalek::SigningKey::generate(&mut rng);
+/// let sender_public = sender_keypair.verifying_key();
+/// let receiver_public = receiver_keypair.verifying_key();
+/// let mut random_message = [0u8; BUFFER_SIZE];
+/// let mut decrypted_message = [0u8; BUFFER_SIZE];
+/// let mut ciphertext = [0u8; BUFFER_SIZE];
+/// rng.fill_bytes(&mut random_message);
+///
+/// let decrypt_materials = encrypt_into(
+///     &sender_keypair,
+///     &receiver_public,
+///     &mut rng,
+///     &random_message[..],
+///     &mut ciphertext[..],
+/// )
+/// .unwrap();
+/// decrypt_into(
+///     &receiver_keypair,
+///     &sender_public,
+///     &decrypt_materials,
+///     &ciphertext[..],
+///     &mut decrypted_message[..],
+/// )
+/// .unwrap();
+///
+/// assert_eq!(random_message, decrypted_message);
+/// assert_ne!(sender_public, receiver_public);
+/// ```
 pub mod errors;
 pub mod morus;
 
@@ -15,12 +80,14 @@ pub const KDF_CONTEXT: &str = "ecies-ed25519-morus/kdf";
 pub use ed25519_dalek::{SecretKey, SigningKey, VerifyingKey};
 pub use errors::Error;
 
+/// A struct containing `nonce` and `tag` for decryption purpose, a result of [encrypt_into]
 #[derive(Clone, Copy, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct DecryptionMaterials {
     pub nonce: Nonce,
     pub tag: DecryptTag,
 }
 
+/// ECIES encrypt method, currently doesn't support heap memory allocations
 pub fn encrypt_into<RNG: rand_core::CryptoRng + rand_core::RngCore>(
     sender_keypair: &SigningKey,
     receiver_public_key: &VerifyingKey,
@@ -33,6 +100,7 @@ pub fn encrypt_into<RNG: rand_core::CryptoRng + rand_core::RngCore>(
     helper::morus_encrypt(&cipher_key, message, rng, ciphertext)
 }
 
+/// ECIES decrypt method, currently doesn't support heap memory allocations
 pub fn decrypt_into(
     receiver_keypair: &SigningKey,
     sender_public_key: &VerifyingKey,
