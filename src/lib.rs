@@ -22,27 +22,32 @@ pub struct DecryptionMaterials {
 }
 
 pub fn encrypt_into<RNG: rand_core::CryptoRng + rand_core::RngCore>(
-    sender_key: &SigningKey,
-    receiver_key: &VerifyingKey,
+    sender_keypair: &SigningKey,
+    receiver_public_key: &VerifyingKey,
     rng: &mut RNG,
     message: &[u8],
     ciphertext: &mut [u8],
 ) -> Result<DecryptionMaterials, Error> {
-    let cipher_key = CipherKey::sender_generate(sender_key, receiver_key)?;
+    let cipher_key = CipherKey::sender_generate(sender_keypair, receiver_public_key)?;
 
     helper::morus_encrypt(&cipher_key, message, rng, ciphertext)
 }
 
 pub fn decrypt_into(
-    receiver_key: &SigningKey,
-    sender_key: &VerifyingKey,
+    receiver_keypair: &SigningKey,
+    sender_public_key: &VerifyingKey,
     decryption_materials: &DecryptionMaterials,
     ciphertext: &[u8],
-    message: &mut [u8],
+    decrypted_message: &mut [u8],
 ) -> Result<(), Error> {
-    let cipher_key = CipherKey::receiver_generate(receiver_key, sender_key)?;
+    let cipher_key = CipherKey::receiver_generate(receiver_keypair, sender_public_key)?;
 
-    helper::morus_decrypt(&cipher_key, ciphertext, decryption_materials, message)
+    helper::morus_decrypt(
+        &cipher_key,
+        ciphertext,
+        decryption_materials,
+        decrypted_message,
+    )
 }
 
 #[derive(zeroize::Zeroize, zeroize::ZeroizeOnDrop)]
@@ -52,12 +57,12 @@ pub(crate) struct CipherKey {
 
 impl CipherKey {
     fn sender_generate(
-        sender_key: &SigningKey,
-        receiver_key: &VerifyingKey,
+        sender_keypair: &SigningKey,
+        receiver_public_key: &VerifyingKey,
     ) -> Result<Self, Error> {
-        let shared_secret = Self::generate_shared_secret(sender_key, receiver_key)?;
+        let shared_secret = Self::generate_shared_secret(sender_keypair, receiver_public_key)?;
         let mut master_key = [0u8; 64];
-        master_key[..32].copy_from_slice(&sender_key.verifying_key().as_bytes()[..]);
+        master_key[..32].copy_from_slice(&sender_keypair.verifying_key().as_bytes()[..]);
         master_key[32..].copy_from_slice(&shared_secret[..]);
         let inner = helper::derive_key(&master_key);
 
@@ -65,12 +70,12 @@ impl CipherKey {
     }
 
     fn receiver_generate(
-        receiver_key: &SigningKey,
-        sender_key: &VerifyingKey,
+        receiver_keypair: &SigningKey,
+        sender_public_key: &VerifyingKey,
     ) -> Result<Self, Error> {
-        let shared_secret = Self::generate_shared_secret(receiver_key, sender_key)?;
+        let shared_secret = Self::generate_shared_secret(receiver_keypair, sender_public_key)?;
         let mut master_key = [0u8; 64];
-        master_key[..32].copy_from_slice(&sender_key.as_bytes()[..]);
+        master_key[..32].copy_from_slice(&sender_public_key.as_bytes()[..]);
         master_key[32..].copy_from_slice(&shared_secret[..]);
         let inner = helper::derive_key(&master_key);
 
@@ -78,15 +83,15 @@ impl CipherKey {
     }
 
     fn generate_shared_secret(
-        secret_key: &SigningKey,
-        public_key: &VerifyingKey,
+        keypair_alice: &SigningKey,
+        public_bob: &VerifyingKey,
     ) -> Result<[u8; 32], Error> {
-        let pk_compressed = curve25519_dalek::edwards::CompressedEdwardsY(public_key.to_bytes());
+        let pk_compressed = curve25519_dalek::edwards::CompressedEdwardsY(public_bob.to_bytes());
         let pk_point = pk_compressed
             .decompress()
             .ok_or(Error::EdwardsPointDecompressionFailure)?;
         let sk_scalar = curve25519_dalek::Scalar::from_bytes_mod_order(
-            curve25519_dalek::scalar::clamp_integer(secret_key.to_scalar_bytes()),
+            curve25519_dalek::scalar::clamp_integer(keypair_alice.to_scalar_bytes()),
         );
         let shared_point = pk_point * sk_scalar;
         let shared_point_compressed = shared_point.compress();
@@ -101,7 +106,7 @@ mod unit_tests {
     use rand_core::RngCore;
 
     const REPETITION: usize = 128;
-    const BUFFER_SIZE: usize = 512 * 1024; // avoid higher than this to avoid stackoverflow
+    const BUFFER_SIZE: usize = 512 * 1024; // avoid higher than this to prevent stackoverflow
 
     #[test]
     fn test_encrypt_decrypt_always_successful() {
