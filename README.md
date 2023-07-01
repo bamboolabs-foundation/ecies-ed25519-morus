@@ -1,5 +1,9 @@
 # ecies-ed25519-morus
 
+![Crates.io](https://img.shields.io/crates/v/ecies-ed25519-morus)
+![docs.rs](https://img.shields.io/docsrs/ecies-ed25519-morus)
+![GitHub](https://img.shields.io/github/license/ujang360/ecies-ed25519-morus)
+
 Experimental [ECIES](https://en.wikipedia.org/wiki/Integrated_Encryption_Scheme) on [Twisted Edwards Curve25519](https://en.wikipedia.org/wiki/Curve25519) and [MORUS-1280-128](https://competitions.cr.yp.to/round3/morusv2.pdf)
 
 ## Notes
@@ -26,17 +30,19 @@ let mut ciphertext = [0u8; BUFFER_SIZE];
 rng.fill_bytes(&mut random_message);
 
 let decrypt_materials = encrypt_into(
+    &mut rng,
     &sender_keypair,
     &receiver_public,
-    &mut rng,
+    &[],
     &random_message[..],
     &mut ciphertext[..],
 )
 .unwrap();
 decrypt_into(
+    &decrypt_materials,
     &receiver_keypair,
     &sender_public,
-    &decrypt_materials,
+    &[],
     &ciphertext[..],
     &mut decrypted_message[..],
 )
@@ -75,7 +81,7 @@ This work is heavily inspired by:
 
 ## Future Works
 
-- [ ] Encrypt & Decrypt with associated data
+- [x] Encrypt & Decrypt with associated data
 - [ ] Improve tests with fuzzers & harnesses
 - [ ] Add benchmark information
 - [ ] Add example and diagrams to elaborate use cases

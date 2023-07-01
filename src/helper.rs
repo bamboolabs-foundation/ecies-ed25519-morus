@@ -7,9 +7,10 @@ pub(crate) fn derive_key(master_key: &[u8]) -> crate::morus::Key {
 }
 
 pub(crate) fn morus_encrypt<RNG: rand_core::CryptoRng + rand_core::RngCore>(
-    key: &crate::CipherKey,
-    message: &[u8],
     rng: &mut RNG,
+    key: &crate::CipherKey,
+    associated_data: &[u8],
+    message: &[u8],
     ciphertext: &mut [u8],
 ) -> Result<crate::DecryptionMaterials, crate::Error> {
     if message.len() != ciphertext.len() {
@@ -20,26 +21,28 @@ pub(crate) fn morus_encrypt<RNG: rand_core::CryptoRng + rand_core::RngCore>(
     let mut nonce = [0u8; 16];
     rng.try_fill_bytes(&mut nonce)
         .map_err(|_| crate::Error::RandomNumbersGenerationError)?;
-    let tag = crate::morus::Morus::new(&nonce, &key.inner).encrypt_in_place(ciphertext, &[]);
+    let tag =
+        crate::morus::Morus::new(&nonce, &key.inner).encrypt_in_place(ciphertext, associated_data);
 
     Ok(crate::DecryptionMaterials { nonce, tag })
 }
 
 pub(crate) fn morus_decrypt(
-    key: &crate::CipherKey,
-    cipertext: &[u8],
     decryption_materials: &crate::DecryptionMaterials,
-    output: &mut [u8],
+    key: &crate::CipherKey,
+    associated_data: &[u8],
+    cipertext: &[u8],
+    message: &mut [u8],
 ) -> Result<(), crate::Error> {
-    if cipertext.len() != output.len() {
+    if cipertext.len() != message.len() {
         return Err(crate::Error::BufferSizeMismatch);
     }
 
-    output.copy_from_slice(cipertext);
+    message.copy_from_slice(cipertext);
     crate::morus::Morus::new(&decryption_materials.nonce, &key.inner).decrypt_in_place(
-        output,
+        message,
         &decryption_materials.tag,
-        &[],
+        associated_data,
     )?;
 
     Ok(())
